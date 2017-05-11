@@ -35,6 +35,7 @@ public class GraphQLSchemaHolder {
     private final GraphQLSchemaConfig graphQLSchemaConfig;
 
     private final ConcurrentHashMap<Class<?>, GraphQLType> objectTypeResolverMap;
+    // TODO: subs
     private Map<String, Map<Class<?>, GraphQLOutputType>> mutationReturnTypeResolverMap;
     private Map<String, Map<Class<?>, GraphQLInputObjectField>> mutationInputTypeResolverMap;
     private Map<GraphQLFieldDefinition, GraphQLFieldDefinitionWrapper> fieldDefinitionResolverMap;

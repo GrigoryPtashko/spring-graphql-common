@@ -21,7 +21,9 @@ package com.oembedler.moon.graphql.engine.execute;
 
 import graphql.GraphQLError;
 import graphql.execution.ExecutionContext;
+import graphql.execution.ExecutionId;
 import graphql.execution.ExecutionStrategy;
+import graphql.execution.instrumentation.NoOpInstrumentation;
 import graphql.language.FragmentDefinition;
 import graphql.language.OperationDefinition;
 import graphql.schema.GraphQLSchema;
@@ -39,7 +41,7 @@ class GraphQLExecutionContext extends ExecutionContext {
     private final int currentDepth;
 
     public GraphQLExecutionContext(ExecutionContext delegate, int currentDepth) {
-        super(delegate.getGraphQLSchema(), delegate.getQueryStrategy(), delegate.getMutationStrategy(), delegate.getFragmentsByName(), delegate.getOperationDefinition(), delegate.getVariables(), delegate.getRoot());
+        super(NoOpInstrumentation.INSTANCE, ExecutionId.from("1"), delegate.getGraphQLSchema(), delegate.getQueryStrategy(), delegate.getMutationStrategy(), delegate.getFragmentsByName(), delegate.getOperationDefinition(), delegate.getVariables(), delegate.getRoot());
         Assert.notNull(delegate, "ExecutionContext can not be null");
         Assert.notNull(delegate, "GraphQLSchemaHolder can not be null");
         this.delegate = delegate;
