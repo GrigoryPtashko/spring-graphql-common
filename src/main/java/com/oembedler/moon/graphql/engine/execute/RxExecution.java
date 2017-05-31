@@ -34,6 +34,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static graphql.execution.TypeInfo.newTypeInfo;
+import static graphql.language.OperationDefinition.Operation.MUTATION;
+import static graphql.language.OperationDefinition.Operation.QUERY;
+import static graphql.language.OperationDefinition.Operation.SUBSCRIPTION;
+
 /**
  * @author <a href="mailto:java.lang.RuntimeException@gmail.com">oEmbedler Inc.</a>
  */
@@ -45,27 +50,44 @@ class RxExecution {
     private final int maxQueryDepth;
     private final int maxQueryComplexity;
 
-    public RxExecution(GraphQLSchemaHolder graphQLSchemaHolder, int maxQueryDepth, int maxQueryComplexity, ExecutionStrategy strategy) {
+    public RxExecution(
+        GraphQLSchemaHolder graphQLSchemaHolder, int maxQueryDepth,
+        int maxQueryComplexity, ExecutionStrategy strategy) {
+
         this.strategy = strategy;
         this.graphQLSchemaHolder = graphQLSchemaHolder;
         this.maxQueryDepth = maxQueryDepth;
         this.maxQueryComplexity = maxQueryComplexity;
     }
 
-    public ExecutionResult execute(GraphQLSchema graphQLSchema, Object root, Document document, String operationName, Map<String, Object> args) {
-        ExecutionContextBuilder executionContextBuilder = new ExecutionContextBuilder(new ValuesResolver(), null);
-        ExecutionContext executionContext = executionContextBuilder.executionId(ExecutionId.from("1")).build(graphQLSchema, strategy, strategy, root, document, operationName, args);
-        return executeOperation(executionContext, root, executionContext.getOperationDefinition());
+    public ExecutionResult execute(
+        GraphQLSchema graphQLSchema, Object root, Document document,
+        String operationName, Map<String, Object> args) {
+
+        ExecutionContextBuilder executionContextBuilder =
+            new ExecutionContextBuilder(new ValuesResolver(), null);
+        ExecutionContext executionContext =
+            executionContextBuilder
+                .executionId(ExecutionId.from("1"))
+                .build(
+                    graphQLSchema, strategy, strategy, strategy, root, document,
+                    operationName, args);
+
+        return
+            executeOperation(
+                executionContext, root, executionContext.getOperationDefinition());
     }
 
-    private GraphQLObjectType getOperationRootType(GraphQLSchema graphQLSchema, OperationDefinition operationDefinition) {
-        if (operationDefinition.getOperation() == OperationDefinition.Operation.MUTATION) {
+    private GraphQLObjectType getOperationRootType(
+        GraphQLSchema graphQLSchema, OperationDefinition operationDefinition) {
+
+        if (operationDefinition.getOperation() == MUTATION) {
             return graphQLSchema.getMutationType();
 
-        } else if (operationDefinition.getOperation() == OperationDefinition.Operation.SUBSCRIPTION) {
+        } else if (operationDefinition.getOperation() == SUBSCRIPTION) {
             return graphQLSchema.getSubscriptionType();
 
-        } else if (operationDefinition.getOperation() == OperationDefinition.Operation.QUERY) {
+        } else if (operationDefinition.getOperation() == QUERY) {
             return graphQLSchema.getQueryType();
 
         } else {
@@ -77,17 +99,34 @@ class RxExecution {
             ExecutionContext executionContext,
             Object root,
             OperationDefinition operationDefinition) {
-        GraphQLObjectType operationRootType = getOperationRootType(executionContext.getGraphQLSchema(), executionContext.getOperationDefinition());
 
-        Map<String, List<Field>> fields = new LinkedHashMap<String, List<Field>>();
-        fieldCollector.collectFields(executionContext, operationRootType, operationDefinition.getSelectionSet(), new ArrayList<String>(), fields);
+        GraphQLObjectType operationRootType =
+            getOperationRootType(
+                executionContext.getGraphQLSchema(),
+                executionContext.getOperationDefinition());
 
-        if (operationDefinition.getOperation() == OperationDefinition.Operation.MUTATION ||
-                operationDefinition.getOperation() == OperationDefinition.Operation.SUBSCRIPTION) {
-            return new GraphQLDefaultRxExecutionStrategy(graphQLSchemaHolder, maxQueryDepth, maxQueryComplexity)
-                                                      .execute(executionContext, operationRootType, root, fields);
+        FieldCollectorParameters fcParameters = FieldCollectorParameters
+            .newParameters(
+                graphQLSchemaHolder.getGraphQLSchema(), operationRootType)
+            .build();
+        Map<String, List<Field>> fields =
+            fieldCollector.collectFields(
+                fcParameters, operationDefinition.getSelectionSet());
+
+        ExecutionParameters parameters =
+            ExecutionParameters.newParameters()
+                .typeInfo(newTypeInfo().type(operationRootType))
+                .source(root)
+                .fields(fields)
+                .build();
+        if (operationDefinition.getOperation() == MUTATION ||
+            operationDefinition.getOperation() == SUBSCRIPTION) {
+            return
+                new GraphQLDefaultRxExecutionStrategy(
+                    graphQLSchemaHolder, maxQueryDepth, maxQueryComplexity)
+                    .execute(executionContext, parameters);
         } else {
-            return strategy.execute(executionContext, operationRootType, root, fields);
+            return strategy.execute(executionContext, parameters);
         }
     }
 }

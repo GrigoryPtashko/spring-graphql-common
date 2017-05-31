@@ -22,6 +22,7 @@ package com.oembedler.moon.graphql.engine.execute;
 import com.oembedler.moon.graphql.engine.GraphQLSchemaHolder;
 import graphql.ExecutionResult;
 import graphql.execution.ExecutionContext;
+import graphql.execution.ExecutionParameters;
 import graphql.language.Field;
 import graphql.schema.GraphQLObjectType;
 import org.apache.commons.lang3.tuple.Pair;
@@ -39,46 +40,77 @@ import java.util.Map;
  */
 class GraphQLDefaultRxExecutionStrategy extends GraphQLAbstractRxExecutionStrategy {
 
-    public GraphQLDefaultRxExecutionStrategy(GraphQLSchemaHolder graphQLSchemaHolder, int maxQueryDepth, int maxQueryComplexity) {
+    public GraphQLDefaultRxExecutionStrategy(
+        GraphQLSchemaHolder graphQLSchemaHolder, int maxQueryDepth,
+        int maxQueryComplexity) {
+
         super(graphQLSchemaHolder, maxQueryDepth, maxQueryComplexity);
     }
 
-    public ExecutionResult doExecute(ExecutionContext executionContext, GraphQLObjectType parentType, Object source, Map<String, List<Field>> fields) {
+    public ExecutionResult doExecute(
+        ExecutionContext executionContext, ExecutionParameters parameters) {
+
+        Map<String, List<Field>> fields = parameters.fields();
 
         List<Observable<Pair<String, Object>>> observablesResult = new ArrayList<>();
         List<Observable<Double>> observablesComplexity = new ArrayList<>();
         for (String fieldName : fields.keySet()) {
             final List<Field> fieldList = fields.get(fieldName);
 
-            ExecutionResult executionResult = resolveField(executionContext, parentType, source, fieldList);
+            ExecutionResult executionResult =
+                resolveField(executionContext, parameters, fieldList);
             observablesResult.add(unwrapExecutionResult(fieldName, executionResult));
-            observablesComplexity.add(calculateFieldComplexity(executionContext, parentType, fieldList,
-                    executionResult != null ? ((GraphQLRxExecutionResult) executionResult).getComplexityObservable() : Observable.just(0.0)));
+            observablesComplexity.add(
+                calculateFieldComplexity(
+                    executionContext,
+                    parameters,
+                    fieldList,
+                    executionResult != null ?
+                        ((GraphQLRxExecutionResult) executionResult).getComplexityObservable() :
+                        Observable.just(0.0)));
         }
 
         Observable<Map<String, Object>> result =
-                Observable.merge(observablesResult)
-                        .toMap(Pair::getLeft, Pair::getRight);
+            Observable.merge(observablesResult)
+                .toMap(Pair::getLeft, Pair::getRight);
 
-        GraphQLRxExecutionResult graphQLRxExecutionResult = new GraphQLRxExecutionResult(result, Observable.just(executionContext.getErrors()), MathObservable.sumDouble(Observable.merge(observablesComplexity)));
-        return graphQLRxExecutionResult;
+        return
+            new GraphQLRxExecutionResult(
+                result,
+                Observable.just(executionContext.getErrors()),
+                MathObservable.sumDouble(Observable.merge(observablesComplexity)));
     }
 
-    protected Observable<Pair<String, Object>> unwrapExecutionResult(String fieldName, ExecutionResult executionResult) {
+    protected Observable<Pair<String, Object>> unwrapExecutionResult(
+        String fieldName, ExecutionResult executionResult) {
+
         Observable<Pair<String, Object>> result;
         if (executionResult instanceof GraphQLRxExecutionResult) {
-            GraphQLRxExecutionResult rxResult = (GraphQLRxExecutionResult) executionResult;
-            Observable<?> unwrappedResult = rxResult.getDataObservable().flatMap(potentialResult -> {
-                if (potentialResult instanceof GraphQLRxExecutionResult) {
-                    return ((GraphQLRxExecutionResult) potentialResult).getDataObservable();
-                }
-                return Observable.just(potentialResult);
-            });
+            GraphQLRxExecutionResult rxResult =
+                (GraphQLRxExecutionResult) executionResult;
+            Observable<?> unwrappedResult =
+                rxResult.getDataObservable().flatMap(potentialResult -> {
+                    if (potentialResult instanceof GraphQLRxExecutionResult) {
+                        return
+                            ((GraphQLRxExecutionResult) potentialResult)
+                                .getDataObservable();
+                    }
 
-            result = Observable.zip(Observable.just(fieldName), unwrappedResult, Pair::of);
+                    return Observable.just(potentialResult);
+                });
+
+            result =
+                Observable.zip(
+                    Observable.just(fieldName), unwrappedResult, Pair::of);
         } else {
-            result = Observable.just(Pair.of(fieldName, executionResult != null ? executionResult.getData() : null));
+            result =
+                Observable.just(
+                    Pair.of(
+                        fieldName,
+                        executionResult != null ?
+                            executionResult.getData() : null));
         }
+
         return result;
     }
 

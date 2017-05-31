@@ -24,7 +24,10 @@ import com.oembedler.moon.graphql.engine.GraphQLSchemaHolder;
 import com.oembedler.moon.graphql.engine.dfs.GraphQLFieldDefinitionWrapper;
 import graphql.ExecutionResult;
 import graphql.execution.ExecutionContext;
+import graphql.execution.ExecutionParameters;
 import graphql.execution.ExecutionStrategy;
+import graphql.execution.NonNullableFieldValidator;
+import graphql.execution.TypeInfo;
 import graphql.language.Field;
 import graphql.language.OperationDefinition;
 import graphql.schema.*;
@@ -61,24 +64,25 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
     }
 
     @Override
-    public ExecutionResult execute(ExecutionContext executionContext, GraphQLObjectType parentType, Object source, Map<String, List<Field>> fields) {
+    public ExecutionResult execute(
+        ExecutionContext executionContext, ExecutionParameters parameters) {
 
         GraphQLExecutionContext graphQLExecutionContext = wrapIfAny(executionContext);
-        if (isCurrentDepthLimitExceeded(graphQLExecutionContext))
+        if (isCurrentDepthLimitExceeded(graphQLExecutionContext)) {
             return null;
+        }
 
-        ExecutionResult executionResult = doExecute(updateContext(graphQLExecutionContext), parentType, source, fields);
-
-        return executionResult;
+        return doExecute(updateContext(graphQLExecutionContext), parameters);
     }
 
-    public abstract ExecutionResult doExecute(ExecutionContext executionContext, GraphQLObjectType parentType, Object source, Map<String, List<Field>> fields);
+    public abstract ExecutionResult doExecute(ExecutionContext executionContext, ExecutionParameters parameters);
 
     protected GraphQLExecutionContext wrapIfAny(ExecutionContext executionContext) {
         if (executionContext instanceof GraphQLExecutionContext) {
             return (GraphQLExecutionContext) executionContext;
         } else {
-            int currentDepth = executionContext.getOperationDefinition().getOperation() == OperationDefinition.Operation.MUTATION ||
+            int currentDepth =
+                executionContext.getOperationDefinition().getOperation() == OperationDefinition.Operation.MUTATION ||
                     executionContext.getOperationDefinition().getOperation() == OperationDefinition.Operation.SUBSCRIPTION ? 1 : 0;
             return new GraphQLExecutionContext(executionContext, currentDepth);
         }
@@ -93,10 +97,11 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
         return maxQueryDepth > 0 && currentDepth > maxQueryDepth;
     }
 
-    protected Observable<Double> calculateFieldComplexity(ExecutionContext executionContext, GraphQLObjectType parentType, List<Field> fields, Observable<Double> childScore) {
+    protected Observable<Double> calculateFieldComplexity(ExecutionContext executionContext, ExecutionParameters parameters, List<Field> fields, Observable<Double> childScore) {
+        GraphQLObjectType type = parameters.typeInfo().castType(GraphQLObjectType.class);
         return childScore.flatMap(aDouble -> {
             Observable<Double> result = Observable.just(aDouble + NODE_SCORE);
-            GraphQLFieldDefinition fieldDef = getFieldDef(executionContext.getGraphQLSchema(), parentType, fields.get(0));
+            GraphQLFieldDefinition fieldDef = getFieldDef(executionContext.getGraphQLSchema(), type, fields.get(0));
             if (fieldDef != null) {
                 GraphQLFieldDefinitionWrapper graphQLFieldDefinitionWrapper = getGraphQLFieldDefinitionWrapper(fieldDef);
                 if (graphQLFieldDefinitionWrapper != null) {
@@ -131,53 +136,83 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
     }
 
     @Override
-    protected ExecutionResult completeValue(ExecutionContext executionContext, GraphQLType fieldType, List<Field> fields, Object result) {
+    protected ExecutionResult completeValue(
+        ExecutionContext executionContext, ExecutionParameters parameters,
+        List<Field> fields) {
+
+        Object result = parameters.source();
         if (result instanceof Observable) {
-            return new GraphQLRxExecutionResult(((Observable<?>) result).map(r -> super.completeValue(executionContext, fieldType, fields, r)), null);
+            return new GraphQLRxExecutionResult(((Observable<?>) result).map(r -> super.completeValue(executionContext, parameters, fields)), null);
         }
-        return super.completeValue(executionContext, fieldType, fields, result);
+
+        return super.completeValue(executionContext, parameters, fields);
     }
 
     @Override
-    protected ExecutionResult completeValueForEnum(GraphQLEnumType enumType, Object result) {
-        return new GraphQLRxExecutionResult(Observable.just(enumType.getCoercing().serialize(result)), Observable.just(null), Observable.just(0.0));
+    protected ExecutionResult completeValueForEnum(GraphQLEnumType enumType, ExecutionParameters parameters, Object result) {
+        Object serialized = enumType.getCoercing().serialize(result);
+        serialized = parameters.nonNullFieldValidator().validate(serialized);
+
+        return new GraphQLRxExecutionResult(Observable.just(serialized), Observable.just(null), Observable.just(0.0));
     }
 
     @Override
-    protected ExecutionResult completeValueForScalar(GraphQLScalarType scalarType, Object result) {
-        return new GraphQLRxExecutionResult(Observable.just(scalarType.getCoercing().serialize(result)), Observable.just(null), Observable.just(0.0));
+    protected ExecutionResult completeValueForScalar(GraphQLScalarType scalarType, ExecutionParameters parameters, Object result) {
+        Object serialized = scalarType.getCoercing().serialize(result);
+        //6.6.1 http://facebook.github.io/graphql/#sec-Field-entries
+        if (serialized instanceof Double && ((Double) serialized).isNaN()) {
+            serialized = null;
+        }
+        serialized = parameters.nonNullFieldValidator().validate(serialized);
+
+        return new GraphQLRxExecutionResult(Observable.just(serialized), Observable.just(null), Observable.just(0.0));
     }
 
     @Override
-    protected ExecutionResult completeValueForList(ExecutionContext executionContext, GraphQLList fieldType, List<Field> fields, Iterable<Object> result) {
+    protected ExecutionResult completeValueForList(
+        ExecutionContext executionContext, ExecutionParameters parameters,
+        List<Field> fields, Iterable<Object> result) {
+
+        TypeInfo typeInfo = parameters.typeInfo();
+        GraphQLList fieldType = typeInfo.castType(GraphQLList.class);
+        TypeInfo wrappedTypeInfo = typeInfo.asType(fieldType.getWrappedType());
+        NonNullableFieldValidator nonNullableFieldValidator = new NonNullableFieldValidator(executionContext, wrappedTypeInfo);
         List<Object> resultAsList = new ArrayList<>();
         result.forEach(resultAsList::add);
         Observable<List<ListTuple>> cachedObservable =
-                Observable.from(
-                        IntStream.range(0, resultAsList.size())
-                                .mapToObj(idx -> new ListTuple(idx, resultAsList.get(idx), null))
-                                .toArray(ListTuple[]::new)
-                )
-                        .flatMap(tuple -> {
-                            ExecutionResult executionResult = completeValue(executionContext, fieldType.getWrappedType(), fields, tuple.result);
-                            if (executionResult instanceof GraphQLRxExecutionResult) {
-                                return Observable.zip(Observable.just(tuple.index),
-                                        ((GraphQLRxExecutionResult) executionResult).getDataObservable(),
-                                        ((GraphQLRxExecutionResult) executionResult).getComplexityObservable(),
-                                        ListTuple::new);
-                            }
-                            return Observable.just(new ListTuple(tuple.index, executionResult.getData(), Observable.just(1.0)));
-                        })
-                        .toList()
-                        .cache();
+            Observable
+                .from(
+                    IntStream.range(0, resultAsList.size())
+                        .mapToObj(idx -> new ListTuple(idx, resultAsList.get(idx), null))
+                        .toArray(ListTuple[]::new))
+                .flatMap(tuple -> {
+                    ExecutionParameters newParameters = ExecutionParameters
+                        .newParameters()
+                        .typeInfo(wrappedTypeInfo)
+                        .fields(parameters.fields())
+                        .nonNullFieldValidator(nonNullableFieldValidator)
+                        .source(tuple.result)
+                        .build();
+                    ExecutionResult executionResult = completeValue(executionContext, newParameters, fields);
+                    if (executionResult instanceof GraphQLRxExecutionResult) {
+                        return Observable.zip(Observable.just(tuple.index),
+                            ((GraphQLRxExecutionResult) executionResult).getDataObservable(),
+                            ((GraphQLRxExecutionResult) executionResult).getComplexityObservable(),
+                            ListTuple::new);
+                    }
 
-        Observable<?> resultObservable = cachedObservable
-                .map(listTuples -> {
-                    return listTuples.stream()
-                            .sorted(Comparator.comparingInt(x -> x.index))
-                            .map(x -> x.result)
-                            .collect(Collectors.toList());
-                });
+                    return Observable.just(new ListTuple(tuple.index, executionResult.getData(), Observable.just(1.0)));
+                })
+                .toList()
+                .cache();
+
+        Observable<?> resultObservable =
+            cachedObservable
+                .map(listTuples ->
+                    listTuples.stream()
+                        .sorted(Comparator.comparingInt(x -> x.index))
+                        .map(x -> x.result)
+                        .collect(Collectors.toList()));
 
         Observable<?> complexityObservable = cachedObservable
                 .map(listTuples -> {

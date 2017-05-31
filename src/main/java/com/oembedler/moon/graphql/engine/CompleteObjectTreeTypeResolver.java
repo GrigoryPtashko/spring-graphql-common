@@ -19,6 +19,7 @@
 
 package com.oembedler.moon.graphql.engine;
 
+import graphql.TypeResolutionEnvironment;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLType;
 import graphql.schema.TypeResolver;
@@ -31,15 +32,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CompleteObjectTreeTypeResolver implements TypeResolver {
 
     private ConcurrentHashMap<Class<?>, GraphQLType>
-            objectTypeResolverMap = new ConcurrentHashMap<Class<?>, GraphQLType>();
+            objectTypeResolverMap = new ConcurrentHashMap<>();
 
-    public CompleteObjectTreeTypeResolver(ConcurrentHashMap<Class<?>, GraphQLType> objectTypeResolverMap) {
+    public CompleteObjectTreeTypeResolver(
+        ConcurrentHashMap<Class<?>, GraphQLType> objectTypeResolverMap) {
+
         this.objectTypeResolverMap = objectTypeResolverMap;
     }
 
     @Override
-    public GraphQLObjectType getType(Object object) {
-        Class<?> cls = object.getClass();
+    public GraphQLObjectType getType(TypeResolutionEnvironment env) {
+        Class<?> cls = env.getObject().getClass();
+
         return (GraphQLObjectType) objectTypeResolverMap.get(cls);
     }
 }

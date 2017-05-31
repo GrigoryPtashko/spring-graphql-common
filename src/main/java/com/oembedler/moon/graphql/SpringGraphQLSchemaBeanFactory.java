@@ -48,17 +48,21 @@ public class SpringGraphQLSchemaBeanFactory implements ApplicationContextAware, 
     @Override
     public <T> boolean containsBean(final Class<T> objectClass) {
         String[] beanNames = applicationContext.getBeanNamesForType(objectClass);
+
         return beanNames != null && beanNames.length > 0;
     }
 
     private <T> T retrieveBean(final Class<T> objectClass, final String beanName) {
-        T object = null;
+        T object;
         if (StringUtils.isNoneBlank(beanName) &&
-                applicationContext != null && applicationContext.containsBean(beanName)) {
+            applicationContext != null &&
+            applicationContext.containsBean(beanName)) {
+
             object = (T) applicationContext.getBean(beanName);
         } else {
             object = BeanFactoryUtils.beanOfType(applicationContext, objectClass);
         }
+
         return object;
     }
 

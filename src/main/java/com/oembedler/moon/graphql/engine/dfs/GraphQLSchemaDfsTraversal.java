@@ -30,6 +30,7 @@ import com.oembedler.moon.graphql.engine.stereotype.GraphQLSchemaQuery;
 import com.oembedler.moon.graphql.engine.type.GraphQLEnumTypeExt;
 import graphql.Scalars;
 import graphql.schema.*;
+import graphql.schema.idl.SchemaPrinter;
 import org.reflections.ReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,18 +105,24 @@ public class GraphQLSchemaDfsTraversal {
         GraphQLObjectType graphQLSubscriptionObjectType = findSchemaSubscriptions(dfsContext, schemaClass);
         GraphQLSchema graphQLSchema;
         if (!graphQLSubscriptionObjectType.getFieldDefinitions().isEmpty()) {
+            LOGGER.info("Building GraphQL schema with subscriptions");
             graphQLSchema = newSchema()
                     .query(graphQLRootQueryObjectType)
                     .mutation(graphQLMutationObjectType)
                     .subscription(graphQLSubscriptionObjectType)
                     .build();
         } else {
+            LOGGER.info("Building GraphQL schema without subscriptions");
             graphQLSchema = newSchema()
                     .query(graphQLRootQueryObjectType)
                     .mutation(graphQLMutationObjectType)
                     .build();
         }
         SchemaHelper.replaceTypeReferencesForUnionType(graphQLSchema, graphQLUnionTypeMap);
+
+        LOGGER.info(
+            "GraphQL schema\n{}", new SchemaPrinter().print(graphQLSchema));
+
         return graphQLSchema;
     }
 
