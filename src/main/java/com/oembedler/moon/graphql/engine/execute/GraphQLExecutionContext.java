@@ -51,7 +51,8 @@ class GraphQLExecutionContext extends ExecutionContext {
             delegate.getFragmentsByName(),
             delegate.getOperationDefinition(),
             delegate.getVariables(),
-            delegate.getRoot());
+            delegate.getRoot(),
+            delegate.getContext());
 
         Assert.notNull(delegate, "ExecutionContext can not be null");
         Assert.notNull(delegate, "GraphQLSchemaHolder can not be null");

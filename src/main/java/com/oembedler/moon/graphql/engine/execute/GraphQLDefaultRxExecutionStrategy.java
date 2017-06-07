@@ -22,7 +22,7 @@ package com.oembedler.moon.graphql.engine.execute;
 import com.oembedler.moon.graphql.engine.GraphQLSchemaHolder;
 import graphql.ExecutionResult;
 import graphql.execution.ExecutionContext;
-import graphql.execution.ExecutionParameters;
+import graphql.execution.ExecutionStrategyParameters;
 import graphql.language.Field;
 import graphql.schema.GraphQLObjectType;
 import org.apache.commons.lang3.tuple.Pair;
@@ -48,7 +48,7 @@ class GraphQLDefaultRxExecutionStrategy extends GraphQLAbstractRxExecutionStrate
     }
 
     public ExecutionResult doExecute(
-        ExecutionContext executionContext, ExecutionParameters parameters) {
+        ExecutionContext executionContext, ExecutionStrategyParameters parameters) {
 
         Map<String, List<Field>> fields = parameters.fields();
 

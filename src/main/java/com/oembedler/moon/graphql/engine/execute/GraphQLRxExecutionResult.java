@@ -79,9 +79,4 @@ public class GraphQLRxExecutionResult implements ExecutionResult {
     public List<GraphQLError> getErrors() {
         return (List<GraphQLError>) errorsObservable.toBlocking().first();
     }
-
-    @Override
-    public Map<Object, Object> getExtensions() {
-        return null;
-    }
 }

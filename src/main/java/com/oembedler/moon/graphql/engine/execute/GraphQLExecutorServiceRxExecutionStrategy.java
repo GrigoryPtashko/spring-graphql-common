@@ -22,7 +22,7 @@ package com.oembedler.moon.graphql.engine.execute;
 import com.oembedler.moon.graphql.engine.GraphQLSchemaHolder;
 import graphql.ExecutionResult;
 import graphql.execution.ExecutionContext;
-import graphql.execution.ExecutionParameters;
+import graphql.execution.ExecutionStrategyParameters;
 import graphql.language.Field;
 import graphql.schema.GraphQLObjectType;
 import org.apache.commons.lang3.tuple.Pair;
@@ -50,7 +50,7 @@ class GraphQLExecutorServiceRxExecutionStrategy extends GraphQLDefaultRxExecutio
         this.executorService = executorService;
     }
 
-    public ExecutionResult doExecute(ExecutionContext executionContext, ExecutionParameters parameters, Map<String, List<Field>> fields) {
+    public ExecutionResult doExecute(ExecutionContext executionContext, ExecutionStrategyParameters parameters, Map<String, List<Field>> fields) {
 
         Map<String, RecursiveTask<ExecutionResult>> recursiveTaskMap = new LinkedHashMap<>();
         for (String fieldName : fields.keySet()) {

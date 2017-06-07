@@ -30,6 +30,7 @@ import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,17 +62,18 @@ class RxExecution {
     }
 
     public ExecutionResult execute(
-        GraphQLSchema graphQLSchema, Object root, Document document,
+        GraphQLSchema graphQLSchema, Object context, Document document,
         String operationName, Map<String, Object> args) {
 
+        Object root = Collections.emptyMap();
         ExecutionContextBuilder executionContextBuilder =
             new ExecutionContextBuilder(new ValuesResolver(), null);
         ExecutionContext executionContext =
             executionContextBuilder
                 .executionId(ExecutionId.from("1"))
                 .build(
-                    graphQLSchema, strategy, strategy, strategy, root, document,
-                    operationName, args);
+                    graphQLSchema, strategy, strategy, strategy, context, root,
+                    document, operationName, args);
 
         return
             executeOperation(
@@ -113,8 +115,8 @@ class RxExecution {
             fieldCollector.collectFields(
                 fcParameters, operationDefinition.getSelectionSet());
 
-        ExecutionParameters parameters =
-            ExecutionParameters.newParameters()
+        ExecutionStrategyParameters parameters =
+            ExecutionStrategyParameters.newParameters()
                 .typeInfo(newTypeInfo().type(operationRootType))
                 .source(root)
                 .fields(fields)

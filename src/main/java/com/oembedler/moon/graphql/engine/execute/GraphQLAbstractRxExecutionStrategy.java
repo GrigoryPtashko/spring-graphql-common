@@ -24,7 +24,7 @@ import com.oembedler.moon.graphql.engine.GraphQLSchemaHolder;
 import com.oembedler.moon.graphql.engine.dfs.GraphQLFieldDefinitionWrapper;
 import graphql.ExecutionResult;
 import graphql.execution.ExecutionContext;
-import graphql.execution.ExecutionParameters;
+import graphql.execution.ExecutionStrategyParameters;
 import graphql.execution.ExecutionStrategy;
 import graphql.execution.NonNullableFieldValidator;
 import graphql.execution.TypeInfo;
@@ -65,7 +65,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
 
     @Override
     public ExecutionResult execute(
-        ExecutionContext executionContext, ExecutionParameters parameters) {
+        ExecutionContext executionContext, ExecutionStrategyParameters parameters) {
 
         GraphQLExecutionContext graphQLExecutionContext = wrapIfAny(executionContext);
         if (isCurrentDepthLimitExceeded(graphQLExecutionContext)) {
@@ -75,7 +75,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
         return doExecute(updateContext(graphQLExecutionContext), parameters);
     }
 
-    public abstract ExecutionResult doExecute(ExecutionContext executionContext, ExecutionParameters parameters);
+    public abstract ExecutionResult doExecute(ExecutionContext executionContext, ExecutionStrategyParameters parameters);
 
     protected GraphQLExecutionContext wrapIfAny(ExecutionContext executionContext) {
         if (executionContext instanceof GraphQLExecutionContext) {
@@ -97,7 +97,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
         return maxQueryDepth > 0 && currentDepth > maxQueryDepth;
     }
 
-    protected Observable<Double> calculateFieldComplexity(ExecutionContext executionContext, ExecutionParameters parameters, List<Field> fields, Observable<Double> childScore) {
+    protected Observable<Double> calculateFieldComplexity(ExecutionContext executionContext, ExecutionStrategyParameters parameters, List<Field> fields, Observable<Double> childScore) {
         GraphQLObjectType type = parameters.typeInfo().castType(GraphQLObjectType.class);
         return childScore.flatMap(aDouble -> {
             Observable<Double> result = Observable.just(aDouble + NODE_SCORE);
@@ -137,7 +137,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
 
     @Override
     protected ExecutionResult completeValue(
-        ExecutionContext executionContext, ExecutionParameters parameters,
+        ExecutionContext executionContext, ExecutionStrategyParameters parameters,
         List<Field> fields) {
 
         Object result = parameters.source();
@@ -149,7 +149,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
     }
 
     @Override
-    protected ExecutionResult completeValueForEnum(GraphQLEnumType enumType, ExecutionParameters parameters, Object result) {
+    protected ExecutionResult completeValueForEnum(GraphQLEnumType enumType, ExecutionStrategyParameters parameters, Object result) {
         Object serialized = enumType.getCoercing().serialize(result);
         serialized = parameters.nonNullFieldValidator().validate(serialized);
 
@@ -157,7 +157,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
     }
 
     @Override
-    protected ExecutionResult completeValueForScalar(GraphQLScalarType scalarType, ExecutionParameters parameters, Object result) {
+    protected ExecutionResult completeValueForScalar(GraphQLScalarType scalarType, ExecutionStrategyParameters parameters, Object result) {
         Object serialized = scalarType.getCoercing().serialize(result);
         //6.6.1 http://facebook.github.io/graphql/#sec-Field-entries
         if (serialized instanceof Double && ((Double) serialized).isNaN()) {
@@ -170,7 +170,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
 
     @Override
     protected ExecutionResult completeValueForList(
-        ExecutionContext executionContext, ExecutionParameters parameters,
+        ExecutionContext executionContext, ExecutionStrategyParameters parameters,
         List<Field> fields, Iterable<Object> result) {
 
         TypeInfo typeInfo = parameters.typeInfo();
@@ -186,7 +186,7 @@ abstract class GraphQLAbstractRxExecutionStrategy extends ExecutionStrategy {
                         .mapToObj(idx -> new ListTuple(idx, resultAsList.get(idx), null))
                         .toArray(ListTuple[]::new))
                 .flatMap(tuple -> {
-                    ExecutionParameters newParameters = ExecutionParameters
+                    ExecutionStrategyParameters newParameters = ExecutionStrategyParameters
                         .newParameters()
                         .typeInfo(wrappedTypeInfo)
                         .fields(parameters.fields())
