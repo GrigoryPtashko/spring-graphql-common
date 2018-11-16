@@ -31,8 +31,10 @@ public class GraphQLSchemaBuilder {
 
     private final GraphQLSchemaConfig graphQLSchemaConfig;
     private final GraphQLSchemaBeanFactory graphQLSchemaBeanFactory;
+    private final TransactionalPropertyDataFetcherFactory transactionalPropertyDataFetcherFactory;
 
-    public GraphQLSchemaBuilder(GraphQLSchemaConfig graphQLSchemaConfig, GraphQLSchemaBeanFactory graphQLSchemaBeanFactory) {
+    public GraphQLSchemaBuilder(GraphQLSchemaConfig graphQLSchemaConfig, GraphQLSchemaBeanFactory graphQLSchemaBeanFactory, TransactionalPropertyDataFetcherFactory transactionalPropertyDataFetcherFactory) {
+        this.transactionalPropertyDataFetcherFactory = transactionalPropertyDataFetcherFactory;
         Assert.notNull(graphQLSchemaConfig, "Schema configuration can not be null");
         Assert.notNull(graphQLSchemaBeanFactory, "Schema bean factory can not be null");
 
@@ -46,7 +48,7 @@ public class GraphQLSchemaBuilder {
         GraphQLSchemaDfsTraversal graphQLSchemaDfsTraversal = new GraphQLSchemaDfsTraversal(
                 schemaClass,
                 getGraphQLSchemaConfig(),
-                getGraphQLSchemaBeanFactory());
+                getGraphQLSchemaBeanFactory(), transactionalPropertyDataFetcherFactory);
 
         GraphQLSchema graphQLSchema = graphQLSchemaDfsTraversal.traverse();
         GraphQLSchemaHolder graphQLSchemaHolder =

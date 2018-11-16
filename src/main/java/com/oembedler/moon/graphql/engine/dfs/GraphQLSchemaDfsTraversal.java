@@ -25,7 +25,6 @@ import com.oembedler.moon.graphql.GraphQLSchemaBeanFactory;
 import com.oembedler.moon.graphql.engine.*;
 import com.oembedler.moon.graphql.engine.stereotype.GraphQLID;
 import com.oembedler.moon.graphql.engine.stereotype.GraphQLInterface;
-import com.oembedler.moon.graphql.engine.stereotype.GraphQLObject;
 import com.oembedler.moon.graphql.engine.stereotype.GraphQLSchemaQuery;
 import com.oembedler.moon.graphql.engine.type.GraphQLEnumTypeExt;
 import graphql.Scalars;
@@ -79,13 +78,15 @@ public class GraphQLSchemaDfsTraversal {
     private final Map<String, Map<Class<?>, GraphQLInputObjectField>> mutationInputTypeResolverMap;
     private final Map<GraphQLFieldDefinition, GraphQLFieldDefinitionWrapper> fieldDefinitionResolverMap;
     private final Set<GraphQLUnionType> graphQLUnionTypeMap;
+    private final TransactionalPropertyDataFetcherFactory transactionalPropertyDataFetcherFactory;
 
     // ---
 
-    public GraphQLSchemaDfsTraversal(Class<?> schemaClass, GraphQLSchemaConfig graphQLSchemaConfig, GraphQLSchemaBeanFactory graphQLSchemaBeanFactory) {
+    public GraphQLSchemaDfsTraversal(Class<?> schemaClass, GraphQLSchemaConfig graphQLSchemaConfig, GraphQLSchemaBeanFactory graphQLSchemaBeanFactory, TransactionalPropertyDataFetcherFactory transactionalPropertyDataFetcherFactory) {
         this.schemaClass = schemaClass;
         this.graphQLSchemaConfig = graphQLSchemaConfig;
         this.graphQLSchemaBeanFactory = graphQLSchemaBeanFactory;
+        this.transactionalPropertyDataFetcherFactory = transactionalPropertyDataFetcherFactory;
         this.graphQLMappingContext = new GraphQLMappingContext(this.graphQLSchemaConfig);
         this.objectTypeResolverMap = new ConcurrentHashMap<>();
         this.objectTypeNameReferenceMap = new ConcurrentHashMap<>();
@@ -304,7 +305,8 @@ public class GraphQLSchemaDfsTraversal {
                     .name(resolvableTypeAccessor.getName())
                     .type(graphQLOutputType)
                     .deprecate(resolvableTypeAccessor.getGraphQLDeprecationReason())
-                    .description(resolvableTypeAccessor.getDescription());
+                    .description(resolvableTypeAccessor.getDescription())
+                    .dataFetcher(transactionalPropertyDataFetcherFactory.createTransactionalPropertyDataFetcher(resolvableTypeAccessor.getName()));
 
             boolean isConstant = Modifier.isFinal(field.getModifiers()) && Modifier.isStatic(field.getModifiers());
             if (isConstant) {

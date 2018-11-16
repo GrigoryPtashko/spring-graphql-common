@@ -19,6 +19,7 @@
 
 package com.oembedler.moon.graphql.engine;
 
+import graphql.schema.PropertyDataFetcher;
 import org.springframework.util.Assert;
 
 /**
@@ -33,7 +34,7 @@ public class GraphQLSchemaConfig {
     private boolean injectClientMutationId = true;
     private boolean allowEmptyClientMutationId = false;
     private boolean injectClientSubscriptionId = true;
-    private boolean allowEmptyClientSubscriptionId = false;
+    private boolean allowEmptyClientSubscriptionId = true;
     private String mutationInputArgumentName = "input";
     private String outputObjectNamePrefix = "Payload";
     private String inputObjectNamePrefix = "Input";
